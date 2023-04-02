@@ -13,7 +13,7 @@ namespace nks_discord_bot.Modules
         [Command("ns-greeting")]
         public async Task InfoAsync() => await ReplyAsync("Hello, I am NKSBot!");
 
-        [Command("ns-emotecounter")]
+        [Command("ns-emojicounter")]
         public async Task EmoteCounterCommand(IUser user, string searchEmote = "")
         {
             Task.Run(async () => await EmoteCounter(user, searchEmote));
@@ -22,8 +22,13 @@ namespace nks_discord_bot.Modules
 
         private async Task EmoteCounter(IUser user, string searchEmote)
         {
-            var result = "";
-            var counter = 0;
+            var emoteText = searchEmote;
+            if (!string.IsNullOrEmpty(searchEmote) && searchEmote.Contains(":"))
+            {
+                emoteText = searchEmote.Split(':')[1].ToLower();
+            }
+            var emoteCounter = new Dictionary<string, int>();
+
             var bearsCall = Context.Client.Guilds.Where(g => g.Name.ToLower().Contains("salt")).First();
             foreach (var channel in bearsCall.TextChannels)
             {
@@ -32,15 +37,49 @@ namespace nks_discord_bot.Modules
                 {
                     foreach (var message in msgCollection)
                     {
-                        if (message.Author.Username == user.Username)
+                        if (message.Author.Username == user.Username && !message.Content.ToLower().Contains("!ns-emojicounter"))
                         {
-                            Console.WriteLine(message.Content);
+                            if (!string.IsNullOrEmpty(emoteText))
+                            {
+                                if (message.Content.ToLower().Contains(emoteText))
+                                {
+                                    int res;
+                                    if (!emoteCounter.TryGetValue(emoteText, out res))
+                                    {
+                                        emoteCounter.Add(emoteText, 0);
+                                    }
+                                    emoteCounter[emoteText]++;
+                                }
+                            }
+                            else
+                            {
+                                await ReplyAsync("This feature is not implemented yet! You need to search for a specific emoji! :smile: ");
+                                return;
+                            }
                         }
                     }
                 }
+
+                // loop cached messages?
             }
 
-            await ReplyAsync("Done!");
+            // Format response
+            var builder = new StringBuilder();
+            builder.AppendLine($"Emoji statistics for {user.Username}:");
+            builder.AppendLine("");
+            if (emoteCounter.Count == 0)
+            {
+                builder.AppendLine($"{user.Username} has not used the queried emoji!");
+            }
+            else
+            {
+                foreach (var kv in emoteCounter)
+                {
+                    builder.AppendLine($"{kv.Key}\t\t\t{kv.Value} time{(kv.Value > 1 ? "s" : "" )}");
+                }
+            }
+
+            await ReplyAsync(Format.Code(builder.ToString()));
         }
     }
 }
